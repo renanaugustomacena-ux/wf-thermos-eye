@@ -2,6 +2,7 @@ package com.alexcupsa.wifithermal.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -130,7 +131,7 @@ fun SettingsScreen() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "Motorola G35 | Android 14 | API 34",
+                    text = "${Build.MANUFACTURER} ${Build.MODEL} | Android ${Build.VERSION.RELEASE} | API ${Build.VERSION.SDK_INT}",
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -35,12 +35,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,7 +63,14 @@ fun ActiveSurveyScreen(
     onComplete: () -> Unit,
     viewModel: ActiveSurveyViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(viewModel) {
+        // Navigate only after completeSurvey()'s coroutine has finished writing
+        // the COMPLETED status to the DB. Calling onComplete() inline would
+        // cancel viewModelScope mid-write and leave the survey ACTIVE forever.
+        viewModel.completionEvents.collect { onComplete() }
+    }
 
     Scaffold { padding ->
         Column(
@@ -104,10 +112,7 @@ fun ActiveSurveyScreen(
                 state = state,
                 onStartRecording = viewModel::startRecording,
                 onStopRecording = viewModel::stopRecording,
-                onComplete = {
-                    viewModel.completeSurvey()
-                    onComplete()
-                },
+                onComplete = { viewModel.completeSurvey() },
             )
         }
     }
@@ -202,7 +207,11 @@ private fun FloorPlanView(
                 translationY = offsetY,
             )
             .transformable(transformState)
-            .pointerInput(Unit) {
+            // Re-key the gesture detector when the transform changes so the
+            // tap handler does not capture stale offsetX/offsetY/scale closures.
+            // Without this, taps after pan/zoom record at wrong normalized
+            // coordinates.
+            .pointerInput(scale, offsetX, offsetY) {
                 detectTapGestures { offset ->
                     val normX = (offset.x - offsetX) / (size.width * scale)
                     val normY = (offset.y - offsetY) / (size.height * scale)

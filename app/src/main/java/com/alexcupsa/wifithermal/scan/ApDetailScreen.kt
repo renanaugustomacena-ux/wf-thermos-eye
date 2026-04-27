@@ -31,9 +31,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.alexcupsa.wifithermal.core.engine.analysis.ThroughputEstimator
 import com.alexcupsa.wifithermal.core.model.ProcessedScanResult
 import com.alexcupsa.wifithermal.core.model.SignalQuality
@@ -50,23 +50,21 @@ import com.alexcupsa.wifithermal.core.ui.theme.SignalFair
 import com.alexcupsa.wifithermal.core.ui.theme.SignalGood
 import com.alexcupsa.wifithermal.core.ui.theme.SignalUnusable
 import com.alexcupsa.wifithermal.core.ui.theme.SignalWeak
-import com.alexcupsa.wifithermal.service.WifiScanService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApDetailScreen(
-    bssid: String,
+    @Suppress("UNUSED_PARAMETER") bssid: String,
     onBack: () -> Unit,
+    viewModel: ApDetailViewModel = hiltViewModel(),
 ) {
-    val scanResults by WifiScanService.scanResults.collectAsState()
-    val ap = remember(scanResults, bssid) {
-        scanResults.firstOrNull { it.bssid == bssid }
-    }
+    val ap by viewModel.ap.collectAsStateWithLifecycle()
 
+    val current = ap
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(ap?.ssid?.ifEmpty { "Hidden AP" } ?: "AP Detail") },
+                title = { Text(current?.ssid?.ifEmpty { "Hidden AP" } ?: "AP Detail") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -75,7 +73,7 @@ fun ApDetailScreen(
             )
         },
     ) { padding ->
-        if (ap == null) {
+        if (current == null) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
@@ -93,11 +91,11 @@ fun ApDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SignalCard(ap)
-            IdentityCard(ap)
-            RadioCard(ap)
-            ThroughputCard(ap)
-            SecurityCard(ap)
+            SignalCard(current)
+            IdentityCard(current)
+            RadioCard(current)
+            ThroughputCard(current)
+            SecurityCard(current)
         }
     }
 }

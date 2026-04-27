@@ -1,7 +1,9 @@
 package com.alexcupsa.wifithermal.core.data.repository
 
+import androidx.room.withTransaction
 import com.alexcupsa.wifithermal.core.data.mapper.toDomain
 import com.alexcupsa.wifithermal.core.data.mapper.toEntity
+import com.alexcupsa.wifithermal.core.database.AppDatabase
 import com.alexcupsa.wifithermal.core.database.dao.MeasurementDao
 import com.alexcupsa.wifithermal.core.database.dao.SurveyDao
 import com.alexcupsa.wifithermal.core.model.MeasurementPoint
@@ -14,6 +16,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MeasurementRepositoryImpl @Inject constructor(
+    private val database: AppDatabase,
     private val measurementDao: MeasurementDao,
     private val surveyDao: SurveyDao,
 ) : MeasurementRepository {
@@ -26,9 +29,17 @@ class MeasurementRepositoryImpl @Inject constructor(
     override suspend fun addMeasurement(surveyId: Long, point: MeasurementPoint) {
         val pointEntity = point.toEntity(surveyId)
         val apEntities = point.apMeasurements.map { it.toEntity(0) }
-        measurementDao.insertMeasurementWithAps(pointEntity, apEntities)
-        val count = measurementDao.getPointCount(surveyId)
-        surveyDao.updatePointCount(surveyId, count)
+        // Single transaction: insert + counter refresh. Without this, a process
+        // kill between insert and the count writes leaves totalPoints/totalAps
+        // permanently stale because subsequent inserts increment from a wrong
+        // base.
+        database.withTransaction {
+            measurementDao.insertMeasurementWithAps(pointEntity, apEntities)
+            val pointCount = measurementDao.getPointCount(surveyId)
+            val apCount = measurementDao.getDistinctApCount(surveyId)
+            surveyDao.updatePointCount(surveyId, pointCount)
+            surveyDao.updateApCount(surveyId, apCount)
+        }
     }
 
     override suspend fun deleteMeasurement(pointId: Long) {

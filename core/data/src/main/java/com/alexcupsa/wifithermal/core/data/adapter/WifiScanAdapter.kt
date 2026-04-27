@@ -1,7 +1,7 @@
 package com.alexcupsa.wifithermal.core.data.adapter
 
 import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
+import android.os.SystemClock
 import com.alexcupsa.wifithermal.core.engine.signal.PathLossModel
 import com.alexcupsa.wifithermal.core.engine.signal.SignalProcessor
 import com.alexcupsa.wifithermal.core.engine.wifi.ChannelMapper
@@ -18,35 +18,46 @@ import javax.inject.Singleton
 class WifiScanAdapter @Inject constructor(
     private val signalProcessor: SignalProcessor,
 ) {
+    @Suppress("DEPRECATION") // ScanResult.SSID: minSdk=34 still requires the
+    // string field; the new getWifiSsid() returns a WifiSsid object that round-
+    // trips to the same value with extra ceremony. Stick with SSID for now.
     fun process(
         scanResults: List<ScanResult>,
         connectedBssid: String?,
-    ): List<ProcessedScanResult> = scanResults.map { sr ->
-        val smoothed = signalProcessor.smooth(sr.BSSID, sr.level)
-        val band = ChannelMapper.bandFromFrequency(sr.frequency)
-        val channel = ChannelMapper.frequencyToChannel(sr.frequency)
-        val security = SecurityParser.parse(sr.capabilities)
-        val channelWidth = mapChannelWidth(sr.channelWidth)
-        val standard = mapWifiStandard(sr.wifiStandard)
-        val distance = PathLossModel.estimateDistance(smoothed, sr.frequency)
+    ): List<ProcessedScanResult> {
+        // Sample one anchor for elapsed-real-time so every result in this batch
+        // gets a consistent age relative to the same now.
+        val nowUs = SystemClock.elapsedRealtimeNanos() / 1000L
+        return scanResults.map { sr ->
+            val smoothed = signalProcessor.smooth(sr.BSSID, sr.level)
+            val band = ChannelMapper.bandFromFrequency(sr.frequency)
+            val channel = ChannelMapper.frequencyToChannel(sr.frequency)
+            val security = SecurityParser.parse(sr.capabilities)
+            val channelWidth = mapChannelWidth(sr.channelWidth)
+            val standard = mapWifiStandard(sr.wifiStandard)
+            val distance = PathLossModel.estimateDistance(smoothed, sr.frequency)
 
-        ProcessedScanResult(
-            ssid = sr.SSID ?: "",
-            bssid = sr.BSSID,
-            rssi = sr.level,
-            smoothedRssi = smoothed,
-            frequency = sr.frequency,
-            channel = channel,
-            channelWidth = channelWidth,
-            band = band,
-            security = security,
-            standard = standard,
-            signalQuality = SignalQuality.fromRssi(smoothed),
-            estimatedDistance = distance,
-            isConnected = sr.BSSID == connectedBssid,
-            vendor = OuiLookup.lookup(sr.BSSID),
-            ageMs = sr.timestamp / 1000,
-        )
+            // ScanResult.timestamp is microseconds since boot; convert age to ms.
+            val ageMs = ((nowUs - sr.timestamp) / 1000L).coerceAtLeast(0L)
+
+            ProcessedScanResult(
+                ssid = sr.SSID ?: "",
+                bssid = sr.BSSID,
+                rssi = sr.level,
+                smoothedRssi = smoothed,
+                frequency = sr.frequency,
+                channel = channel,
+                channelWidth = channelWidth,
+                band = band,
+                security = security,
+                standard = standard,
+                signalQuality = SignalQuality.fromRssi(smoothed),
+                estimatedDistance = distance,
+                isConnected = sr.BSSID == connectedBssid,
+                vendor = OuiLookup.lookup(sr.BSSID),
+                ageMs = ageMs,
+            )
+        }
     }
 
     private fun mapChannelWidth(width: Int): ChannelWidth = when (width) {

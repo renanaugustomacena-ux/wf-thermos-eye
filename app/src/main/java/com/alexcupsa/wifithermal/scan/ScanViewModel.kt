@@ -3,6 +3,7 @@ package com.alexcupsa.wifithermal.scan
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
 import com.alexcupsa.wifithermal.core.engine.wifi.ChannelAnalyzer
 import com.alexcupsa.wifithermal.core.model.ChannelAnalysisResult
 import com.alexcupsa.wifithermal.core.model.ProcessedScanResult
@@ -30,6 +31,7 @@ data class ScanUiState(
 @HiltViewModel
 class ScanViewModel @Inject constructor(
     private val application: Application,
+    scanState: WifiScanStateRepository,
 ) : AndroidViewModel(application) {
 
     private val _sortMode = MutableStateFlow(SortMode.SIGNAL)
@@ -38,8 +40,8 @@ class ScanViewModel @Inject constructor(
     private val _filterBand = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<ScanUiState> = combine(
-        WifiScanService.scanResults,
-        WifiScanService.scanStatus,
+        scanState.scanResults,
+        scanState.scanStatus,
         _sortMode,
         _filterBand,
     ) { results, status, sort, band ->
@@ -75,7 +77,11 @@ class ScanViewModel @Inject constructor(
     }
 
     fun stopScanning() {
-        application.startService(WifiScanService.stopIntent(application))
+        // Foreground-service routing: the service promotes itself in
+        // onStartCommand before dispatching the action, so even the stop
+        // signal must come through startForegroundService to satisfy the
+        // Android 14 5-second startForeground deadline.
+        application.startForegroundService(WifiScanService.stopIntent(application))
     }
 
     fun singleScan() {

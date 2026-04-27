@@ -14,10 +14,12 @@ import com.alexcupsa.wifithermal.core.model.MeasurementSample
 import com.alexcupsa.wifithermal.core.model.Survey
 import com.alexcupsa.wifithermal.core.model.WifiBand
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -51,52 +53,38 @@ class HeatmapViewModel @Inject constructor(
         viewModelScope.launch {
             val survey = surveyRepository.getSurveyById(surveyId)
             val summaries = measurementRepository.getApSummary(surveyId)
-            _uiState.value = _uiState.value.copy(
-                survey = survey,
-                apSummaries = summaries,
-            )
+            _uiState.update { it.copy(survey = survey, apSummaries = summaries) }
             generateHeatmap()
         }
     }
 
     fun setMode(mode: HeatmapMode) {
-        _uiState.value = _uiState.value.copy(mode = mode, selectedBssid = null)
+        _uiState.update { it.copy(mode = mode, selectedBssid = null) }
         viewModelScope.launch { generateHeatmap() }
     }
 
     fun selectBssid(bssid: String) {
-        _uiState.value = _uiState.value.copy(mode = HeatmapMode.BSSID, selectedBssid = bssid)
+        _uiState.update { it.copy(mode = HeatmapMode.BSSID, selectedBssid = bssid) }
         viewModelScope.launch { generateHeatmap() }
     }
 
     fun setColorScheme(scheme: ColorScheme) {
-        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(colorScheme = scheme))
+        _uiState.update { it.copy(config = it.config.copy(colorScheme = scheme)) }
     }
 
     private suspend fun generateHeatmap() {
-        _uiState.value = _uiState.value.copy(generating = true, errorMessage = null)
+        _uiState.update { it.copy(generating = true, errorMessage = null) }
 
         try {
-            val samples = withContext(Dispatchers.IO) {
-                when (_uiState.value.mode) {
-                    HeatmapMode.BSSID -> {
-                        val bssid = _uiState.value.selectedBssid
-                            ?: _uiState.value.apSummaries.firstOrNull()?.bssid
-                            ?: return@withContext emptyList()
-                        _uiState.value = _uiState.value.copy(selectedBssid = bssid)
-                        measurementRepository.getMeasurementSamples(surveyId, bssid)
-                    }
-                    HeatmapMode.BAND_2_4 -> measurementRepository.getBandMeasurementSamples(surveyId, WifiBand.BAND_2_4_GHZ)
-                    HeatmapMode.BAND_5 -> measurementRepository.getBandMeasurementSamples(surveyId, WifiBand.BAND_5_GHZ)
+            val samples = loadSamples()
+            if (samples.size < MIN_SAMPLES) {
+                _uiState.update {
+                    it.copy(
+                        grid = null,
+                        generating = false,
+                        errorMessage = "Need at least $MIN_SAMPLES measurement points (have ${samples.size})",
+                    )
                 }
-            }
-
-            if (samples.size < 3) {
-                _uiState.value = _uiState.value.copy(
-                    grid = null,
-                    generating = false,
-                    errorMessage = "Need at least 3 measurement points (have ${samples.size})",
-                )
                 return
             }
 
@@ -109,16 +97,33 @@ class HeatmapViewModel @Inject constructor(
                 )
             }
 
-            _uiState.value = _uiState.value.copy(grid = grid, generating = false)
+            _uiState.update { it.copy(grid = grid, generating = false) }
+        } catch (e: CancellationException) {
+            // Structured concurrency: never swallow cancellation. The viewModelScope
+            // was cancelled (ViewModel cleared) — propagate so child accounting stays
+            // honest.
+            throw e
         } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
-                generating = false,
-                errorMessage = e.message,
-            )
+            _uiState.update { it.copy(generating = false, errorMessage = e.message) }
+        }
+    }
+
+    private suspend fun loadSamples(): List<MeasurementSample> = withContext(Dispatchers.IO) {
+        when (val mode = _uiState.value.mode) {
+            HeatmapMode.BSSID -> {
+                val bssid = _uiState.value.selectedBssid
+                    ?: _uiState.value.apSummaries.firstOrNull()?.bssid
+                    ?: return@withContext emptyList()
+                _uiState.update { it.copy(selectedBssid = bssid) }
+                measurementRepository.getMeasurementSamples(surveyId, bssid)
+            }
+            HeatmapMode.BAND_2_4 -> measurementRepository.getBandMeasurementSamples(surveyId, WifiBand.BAND_2_4_GHZ)
+            HeatmapMode.BAND_5 -> measurementRepository.getBandMeasurementSamples(surveyId, WifiBand.BAND_5_GHZ)
         }
     }
 
     companion object {
         private const val GRID_SIZE = 100
+        private const val MIN_SAMPLES = 3
     }
 }

@@ -89,4 +89,14 @@ interface MeasurementDao {
 
     @Query("SELECT COUNT(*) FROM measurement_points WHERE surveyId = :surveyId")
     suspend fun getPointCount(surveyId: Long): Int
+
+    @Query(
+        """
+        SELECT COUNT(DISTINCT am.bssid)
+        FROM ap_measurements am
+        INNER JOIN measurement_points mp ON am.measurementPointId = mp.id
+        WHERE mp.surveyId = :surveyId
+        """,
+    )
+    suspend fun getDistinctApCount(surveyId: Long): Int
 }

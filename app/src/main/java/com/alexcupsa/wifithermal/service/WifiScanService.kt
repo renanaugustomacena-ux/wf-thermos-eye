@@ -6,10 +6,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.IBinder
 import com.alexcupsa.wifithermal.core.data.adapter.WifiScanAdapter
-import com.alexcupsa.wifithermal.core.model.ProcessedScanResult
+import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
 import com.alexcupsa.wifithermal.core.model.ScanStatus
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -18,50 +23,84 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class WifiScanService : Service() {
 
     @Inject lateinit var scanAdapter: WifiScanAdapter
+    @Inject lateinit var scanState: WifiScanStateRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var wifiManager: WifiManager
+    private lateinit var connectivityManager: ConnectivityManager
     private var scanJob: Job? = null
 
+    private val timestampsMutex = Mutex()
     private val scanTimestamps = ArrayDeque<Long>(THROTTLE_MAX_SCANS)
+
+    @Volatile private var connectedBssid: String? = null
 
     private val scanReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
-            if (success || _scanResults.value.isEmpty()) {
+            if (success || scanState.scanResults.value.isEmpty()) {
                 processScanResults()
             }
+        }
+    }
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+            val wifiInfo = capabilities.transportInfo as? WifiInfo ?: return
+            val bssid = wifiInfo.bssid?.takeIf { it != REDACTED_BSSID }
+            connectedBssid = bssid
+        }
+
+        override fun onLost(network: Network) {
+            connectedBssid = null
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         wifiManager = getSystemService(WIFI_SERVICE) as WifiManager
+        connectivityManager = getSystemService(ConnectivityManager::class.java)
         ScanNotificationManager.createChannel(this)
         registerReceiver(
             scanReceiver,
             IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION),
             RECEIVER_NOT_EXPORTED,
         )
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+        connectivityManager.registerNetworkCallback(request, networkCallback)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Android 14+ requires startForeground() within 5 seconds of every
+        // onStartCommand, including null-intent restarts. Promote first, then
+        // route on the action.
+        promoteToForeground()
+
         when (intent?.action) {
             ACTION_START_SCANNING -> startScanning()
             ACTION_STOP_SCANNING -> stopScanning()
             ACTION_SINGLE_SCAN -> performSingleScan()
+            else -> {
+                // Null intent (process restart with no pending command) or unknown
+                // action — we already called startForeground, now stop cleanly.
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf(startId)
+            }
         }
-        return START_STICKY
+        // We do not want Android to re-deliver this command; consumers re-issue
+        // explicit start intents on user action.
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -69,17 +108,22 @@ class WifiScanService : Service() {
     override fun onDestroy() {
         scanJob?.cancel()
         scope.cancel()
-        try { unregisterReceiver(scanReceiver) } catch (_: Exception) {}
+        scanState.updateStatus(ScanStatus.IDLE)
+        runCatching { unregisterReceiver(scanReceiver) }
+        runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
         super.onDestroy()
     }
 
-    private fun startScanning() {
+    private fun promoteToForeground() {
         startForeground(
             ScanNotificationManager.NOTIFICATION_ID,
-            ScanNotificationManager.buildNotification(this, scanning = true),
+            ScanNotificationManager.buildNotification(this, scanning = scanJob?.isActive == true),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
-        _scanStatus.value = ScanStatus.SCANNING
+    }
+
+    private fun startScanning() {
+        scanState.updateStatus(ScanStatus.SCANNING)
 
         scanJob?.cancel()
         scanJob = scope.launch {
@@ -88,10 +132,10 @@ class WifiScanService : Service() {
                     triggerScan()
                     delay(SCAN_INTERVAL_MS)
                 } else {
-                    _scanStatus.value = ScanStatus.THROTTLED
+                    scanState.updateStatus(ScanStatus.THROTTLED)
                     val waitMs = timeUntilNextScan()
                     delay(waitMs)
-                    _scanStatus.value = ScanStatus.SCANNING
+                    scanState.updateStatus(ScanStatus.SCANNING)
                 }
             }
         }
@@ -100,49 +144,52 @@ class WifiScanService : Service() {
     private fun stopScanning() {
         scanJob?.cancel()
         scanJob = null
-        _scanStatus.value = ScanStatus.IDLE
+        scanState.updateStatus(ScanStatus.IDLE)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     private fun performSingleScan() {
-        startForeground(
-            ScanNotificationManager.NOTIFICATION_ID,
-            ScanNotificationManager.buildNotification(this, scanning = true),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-        )
-        _scanStatus.value = ScanStatus.SCANNING
+        scanState.updateStatus(ScanStatus.SCANNING)
 
         scope.launch {
-            if (canScan()) {
+            val started = if (canScan()) {
                 triggerScan()
                 delay(SCAN_RESULT_WAIT_MS)
+                true
+            } else {
+                scanState.updateStatus(ScanStatus.THROTTLED)
+                false
             }
-            processScanResults()
-            _scanStatus.value = ScanStatus.COMPLETE
+            if (started) {
+                processScanResults()
+                scanState.updateStatus(ScanStatus.COMPLETE)
+            }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
 
     @Suppress("DEPRECATION")
-    private fun triggerScan() {
+    private suspend fun triggerScan() {
         recordScanTimestamp()
-        wifiManager.startScan()
+        val started = wifiManager.startScan()
+        if (!started) {
+            // OS-level throttle bucket overrun (independent of our local window).
+            scanState.updateStatus(ScanStatus.THROTTLED)
+        }
     }
 
-    @Suppress("DEPRECATION")
     private fun processScanResults() {
         try {
             val raw = wifiManager.scanResults ?: return
-            val connInfo = wifiManager.connectionInfo
-            val connBssid = connInfo?.bssid?.takeIf { it != "02:00:00:00:00:00" }
-            val processed = scanAdapter.process(raw, connBssid)
+            val processed = scanAdapter.process(raw, connectedBssid)
                 .sortedByDescending { it.smoothedRssi }
-            _scanResults.value = processed
+            scanState.updateResults(processed)
             updateNotification(processed.size)
         } catch (_: SecurityException) {
-            // Location permission not granted
+            // Location permission revoked while service was running.
+            scanState.updateStatus(ScanStatus.IDLE)
         }
     }
 
@@ -150,28 +197,29 @@ class WifiScanService : Service() {
         val notification = ScanNotificationManager.buildNotification(
             this,
             apCount = apCount,
-            scanning = _scanStatus.value == ScanStatus.SCANNING,
+            scanning = scanState.scanStatus.value == ScanStatus.SCANNING,
         )
         val nm = getSystemService(android.app.NotificationManager::class.java)
         nm.notify(ScanNotificationManager.NOTIFICATION_ID, notification)
     }
 
     // HC-1: Android throttles to 4 scans per 2 minutes for foreground apps.
-    // We track our own timestamps to stay under the limit proactively.
-    private fun canScan(): Boolean {
+    // We track our own timestamps to stay under the limit proactively. Mutex
+    // because the deque is mutated from coroutines on Dispatchers.Default.
+    private suspend fun canScan(): Boolean = timestampsMutex.withLock {
         val now = System.currentTimeMillis()
         pruneOldTimestamps(now)
-        return scanTimestamps.size < THROTTLE_MAX_SCANS
+        scanTimestamps.size < THROTTLE_MAX_SCANS
     }
 
-    private fun timeUntilNextScan(): Long {
-        if (scanTimestamps.isEmpty()) return 0
+    private suspend fun timeUntilNextScan(): Long = timestampsMutex.withLock {
+        if (scanTimestamps.isEmpty()) return@withLock 0L
         val oldest = scanTimestamps.first()
         val available = oldest + THROTTLE_WINDOW_MS - System.currentTimeMillis()
-        return available.coerceAtLeast(1000)
+        available.coerceAtLeast(1000L)
     }
 
-    private fun recordScanTimestamp() {
+    private suspend fun recordScanTimestamp() = timestampsMutex.withLock {
         scanTimestamps.addLast(System.currentTimeMillis())
     }
 
@@ -191,11 +239,9 @@ class WifiScanService : Service() {
         private const val SCAN_INTERVAL_MS = 32_000L
         private const val SCAN_RESULT_WAIT_MS = 3_000L
 
-        private val _scanResults = MutableStateFlow<List<ProcessedScanResult>>(emptyList())
-        val scanResults: StateFlow<List<ProcessedScanResult>> = _scanResults.asStateFlow()
-
-        private val _scanStatus = MutableStateFlow(ScanStatus.IDLE)
-        val scanStatus: StateFlow<ScanStatus> = _scanStatus.asStateFlow()
+        // Sentinel value Android returns instead of a real BSSID when the caller
+        // does not hold the perms required to read it.
+        private const val REDACTED_BSSID = "02:00:00:00:00:00"
 
         fun startIntent(context: Context): Intent =
             Intent(context, WifiScanService::class.java).apply {

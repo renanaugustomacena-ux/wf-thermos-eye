@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.alexcupsa.wifithermal.core.data.repository.SurveyRepository
+import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
 import com.alexcupsa.wifithermal.core.model.ProcessedScanResult
 import com.alexcupsa.wifithermal.core.model.ScanStatus
 import com.alexcupsa.wifithermal.core.model.SignalQuality
@@ -29,11 +30,12 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val application: Application,
     surveyRepository: SurveyRepository,
+    scanState: WifiScanStateRepository,
 ) : AndroidViewModel(application) {
 
     val uiState: StateFlow<DashboardUiState> = combine(
-        WifiScanService.scanResults,
-        WifiScanService.scanStatus,
+        scanState.scanResults,
+        scanState.scanStatus,
         surveyRepository.getAllSurveys(),
     ) { results, status, surveys ->
         val distribution = results.groupBy { it.signalQuality }.mapValues { it.value.size }

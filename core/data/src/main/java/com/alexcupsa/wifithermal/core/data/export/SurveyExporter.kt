@@ -88,7 +88,7 @@ class SurveyExporter @Inject constructor(
     private fun csvRow(point: MeasurementPoint, ap: ApMeasurement): String =
         "${point.id},${point.position.x},${point.position.y},${point.position.floor}," +
             "${point.position.confidence},${point.timestamp}," +
-            "${ap.bssid},${csvEscape(ap.ssid)},${ap.rssi},${ap.smoothedRssi}," +
+            "${csvEscape(ap.bssid)},${csvEscape(ap.ssid)},${ap.rssi},${ap.smoothedRssi}," +
             "${ap.frequency},${ap.channel},${ap.channelWidth.name},${ap.band.name}," +
             "${ap.security.name},${ap.standard.name}"
 

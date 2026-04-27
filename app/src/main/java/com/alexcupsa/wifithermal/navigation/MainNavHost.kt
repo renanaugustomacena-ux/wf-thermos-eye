@@ -114,7 +114,7 @@ fun MainNavHost() {
                 composable("scan") {
                     ScanScreen(
                         onApClick = { bssid ->
-                            navController.navigate("ap/$bssid")
+                            navController.navigate("ap/${android.net.Uri.encode(bssid)}")
                         },
                     )
                 }

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.alexcupsa.wifithermal.core.data.repository.FloorPlanRepository
 import com.alexcupsa.wifithermal.core.data.repository.MeasurementRepository
 import com.alexcupsa.wifithermal.core.data.repository.SurveyRepository
+import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
 import com.alexcupsa.wifithermal.core.model.ApMeasurement
 import com.alexcupsa.wifithermal.core.model.FloorPlan
 import com.alexcupsa.wifithermal.core.model.MeasurementPoint
@@ -15,10 +16,13 @@ import com.alexcupsa.wifithermal.core.model.ProcessedScanResult
 import com.alexcupsa.wifithermal.core.model.Survey
 import com.alexcupsa.wifithermal.service.WifiScanService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -40,6 +44,7 @@ class ActiveSurveyViewModel @Inject constructor(
     private val surveyRepository: SurveyRepository,
     private val measurementRepository: MeasurementRepository,
     private val floorPlanRepository: FloorPlanRepository,
+    private val scanState: WifiScanStateRepository,
 ) : AndroidViewModel(application) {
 
     private val surveyId: Long = savedStateHandle.get<Long>("surveyId") ?: 0L
@@ -49,11 +54,18 @@ class ActiveSurveyViewModel @Inject constructor(
     private val _isRecording = MutableStateFlow(false)
     private val _tapPosition = MutableStateFlow<Position?>(null)
 
+    private val _completionEvents = MutableSharedFlow<Unit>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val completionEvents: SharedFlow<Unit> = _completionEvents.asSharedFlow()
+
     val uiState: StateFlow<ActiveSurveyUiState> = combine(
         _survey,
         _floorPlan,
         measurementRepository.getMeasurements(surveyId),
-        WifiScanService.scanResults,
+        scanState.scanResults,
         combine(_isRecording, _tapPosition) { rec, tap -> rec to tap },
     ) { survey, floorPlan, measurements, scanResults, (recording, tapPos) ->
         ActiveSurveyUiState(
@@ -83,7 +95,7 @@ class ActiveSurveyViewModel @Inject constructor(
 
     fun stopRecording() {
         _isRecording.value = false
-        application.startService(WifiScanService.stopIntent(application))
+        application.startForegroundService(WifiScanService.stopIntent(application))
     }
 
     fun onFloorPlanTap(x: Double, y: Double) {
@@ -92,7 +104,7 @@ class ActiveSurveyViewModel @Inject constructor(
 
     fun recordMeasurement() {
         val pos = _tapPosition.value ?: return
-        val scanResults = WifiScanService.scanResults.value
+        val scanResults = scanState.scanResults.value
         if (scanResults.isEmpty()) return
 
         viewModelScope.launch {
@@ -123,6 +135,7 @@ class ActiveSurveyViewModel @Inject constructor(
         viewModelScope.launch {
             stopRecording()
             surveyRepository.completeSurvey(surveyId)
+            _completionEvents.tryEmit(Unit)
         }
     }
 }
