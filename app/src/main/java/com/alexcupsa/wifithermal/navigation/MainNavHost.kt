@@ -32,6 +32,7 @@ import com.alexcupsa.wifithermal.audit.AuditDashboardScreen
 import com.alexcupsa.wifithermal.audit.IncidentLogScreen
 import com.alexcupsa.wifithermal.audit.TriangulationScreen
 import com.alexcupsa.wifithermal.authorization.AuthorizationScreen
+import com.alexcupsa.wifithermal.report.ReportScreen
 import com.alexcupsa.wifithermal.scan.ApDetailScreen
 import com.alexcupsa.wifithermal.scan.ScanScreen
 import com.alexcupsa.wifithermal.security.SecurityScreen
@@ -87,6 +88,7 @@ fun MainNavHost() {
                         onNavigateToAuthorization = { navController.navigate("authorization") },
                         onNavigateToAlerts = { navController.navigate("alerts") },
                         onNavigateToWhitelist = { navController.navigate("whitelist") },
+                        onNavigateToReports = { navController.navigate("reports") },
                     )
                 }
                 composable("alerts") {
@@ -130,6 +132,9 @@ fun MainNavHost() {
                 }
                 composable("authorization") {
                     AuthorizationScreen(onBack = { navController.popBackStack() })
+                }
+                composable("reports") {
+                    ReportScreen(onBack = { navController.popBackStack() })
                 }
                 composable("scan") {
                     ScanScreen(

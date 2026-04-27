@@ -53,6 +53,7 @@ fun AuditDashboardScreen(
     onNavigateToAuthorization: () -> Unit,
     onNavigateToAlerts: () -> Unit,
     onNavigateToWhitelist: () -> Unit,
+    onNavigateToReports: () -> Unit,
     viewModel: AuditDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -101,6 +102,27 @@ fun AuditDashboardScreen(
 
         if (state.recentIncidents.isNotEmpty()) {
             RecentIncidentsCard(state.recentIncidents)
+            Spacer(Modifier.height(12.dp))
+        }
+
+        ReportsLink(onNavigateToReports)
+    }
+}
+
+@Composable
+private fun ReportsLink(onTap: () -> Unit) {
+    Card(
+        onClick = onTap,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Reports", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "Export incident timeline + whitelist as CSV / PDF, with redaction levels for IT or HR sharing.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
