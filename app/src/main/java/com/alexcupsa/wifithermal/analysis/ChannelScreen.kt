@@ -20,8 +20,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,14 +40,12 @@ import com.alexcupsa.wifithermal.core.ui.theme.SignalFair
 import com.alexcupsa.wifithermal.core.ui.theme.SignalGood
 import com.alexcupsa.wifithermal.core.ui.theme.SignalUnusable
 import com.alexcupsa.wifithermal.core.ui.theme.SignalWeak
-import com.alexcupsa.wifithermal.scan.ScanViewModel
-
 @Composable
 fun ChannelScreen(
-    viewModel: ScanViewModel = hiltViewModel(),
+    viewModel: ChannelAnalysisViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val analysis = state.channelAnalysis
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val analysis = state.analysis
 
     Column(
         modifier = Modifier

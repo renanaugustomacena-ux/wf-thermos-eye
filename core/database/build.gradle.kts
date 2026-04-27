@@ -4,6 +4,14 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+ksp {
+    // Room exports schema JSON snapshots committed to schemas/ in version
+    // control. Future schema bumps must add a Migration object validated via
+    // MigrationTestHelper; fallbackToDestructiveMigration is the v0.x policy
+    // until v1 ships.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     namespace = "com.alexcupsa.wifithermal.core.database"
     compileSdk = 35

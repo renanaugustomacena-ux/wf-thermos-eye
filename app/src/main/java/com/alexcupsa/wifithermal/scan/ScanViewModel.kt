@@ -4,8 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
-import com.alexcupsa.wifithermal.core.engine.wifi.ChannelAnalyzer
-import com.alexcupsa.wifithermal.core.model.ChannelAnalysisResult
 import com.alexcupsa.wifithermal.core.model.ProcessedScanResult
 import com.alexcupsa.wifithermal.core.model.ScanStatus
 import com.alexcupsa.wifithermal.service.WifiScanService
@@ -25,7 +23,6 @@ data class ScanUiState(
     val scanStatus: ScanStatus = ScanStatus.IDLE,
     val sortMode: SortMode = SortMode.SIGNAL,
     val filterBand: String? = null,
-    val channelAnalysis: ChannelAnalysisResult? = null,
 )
 
 @HiltViewModel
@@ -59,16 +56,11 @@ class ScanViewModel @Inject constructor(
             SortMode.SECURITY -> filtered.sortedBy { it.security.ordinal }
         }
 
-        val channelAnalysis = if (results.isNotEmpty()) {
-            ChannelAnalyzer.analyze(results)
-        } else null
-
         ScanUiState(
             results = sorted,
             scanStatus = status,
             sortMode = sort,
             filterBand = band,
-            channelAnalysis = channelAnalysis,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ScanUiState())
 

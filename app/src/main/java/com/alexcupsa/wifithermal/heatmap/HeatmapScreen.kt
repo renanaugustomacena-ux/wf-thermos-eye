@@ -28,8 +28,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,7 +52,7 @@ fun HeatmapScreen(
     onBack: () -> Unit,
     viewModel: HeatmapViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -83,14 +83,16 @@ fun HeatmapScreen(
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
+                val errorMessage = state.errorMessage
+                val grid = state.grid
                 when {
                     state.generating -> CircularProgressIndicator()
-                    state.errorMessage != null -> Text(
-                        text = state.errorMessage!!,
+                    errorMessage != null -> Text(
+                        text = errorMessage,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(16.dp),
                     )
-                    state.grid != null -> HeatmapCanvas(state.grid!!, state.config.colorScheme)
+                    grid != null -> HeatmapCanvas(grid, state.config.colorScheme)
                     else -> Text("No data", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
