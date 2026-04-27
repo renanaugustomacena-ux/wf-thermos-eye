@@ -30,4 +30,10 @@ enum class IncidentKind {
     AP_REMOVED_FROM_WHITELIST,
     SCOPE_LOADED,
     SCOPE_EXPIRED,
+
+    /**
+     * Layer B sniffer offered a capture for a BSSID not in the offensive
+     * authorization list. Recorded with HIGH severity for forensic review.
+     */
+    SCOPE_VIOLATION_BLOCKED,
 }

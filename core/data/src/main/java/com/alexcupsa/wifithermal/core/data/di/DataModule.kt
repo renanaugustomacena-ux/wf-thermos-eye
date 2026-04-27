@@ -3,6 +3,7 @@ package com.alexcupsa.wifithermal.core.data.di
 import android.content.Context
 import androidx.room.Room
 import com.alexcupsa.wifithermal.core.database.AppDatabase
+import com.alexcupsa.wifithermal.core.database.dao.CapturedHandshakeDao
 import com.alexcupsa.wifithermal.core.database.dao.IncidentDao
 import com.alexcupsa.wifithermal.core.database.dao.RssiSampleDao
 import com.alexcupsa.wifithermal.core.database.dao.WhitelistDao
@@ -41,6 +42,10 @@ object DataModule {
     @Provides
     @Singleton
     fun provideRssiSampleDao(db: AppDatabase): RssiSampleDao = db.rssiSampleDao()
+
+    @Provides
+    @Singleton
+    fun provideCapturedHandshakeDao(db: AppDatabase): CapturedHandshakeDao = db.capturedHandshakeDao()
 
     @Provides
     @Singleton

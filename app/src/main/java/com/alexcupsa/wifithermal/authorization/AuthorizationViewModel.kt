@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alexcupsa.wifithermal.core.data.repository.AuthorizationManifestRepository
 import com.alexcupsa.wifithermal.core.model.audit.AuthorizationScope
+import com.alexcupsa.wifithermal.core.model.audit.OffensiveScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,7 +38,22 @@ class AuthorizationViewModel @Inject constructor(
         bssidPrefixes: List<String>,
         expiresAt: Long?,
         notes: String,
+        offensiveBssids: List<String>,
+        offensiveNotes: String,
     ) {
+        val cleanedOffensive = offensiveBssids.map { it.trim().uppercase() }
+            .filter { it.matches(BSSID_REGEX) }
+
+        val offensiveBlock = if (cleanedOffensive.isNotEmpty() || offensiveNotes.isNotBlank()) {
+            OffensiveScope(
+                authorizedBssids = cleanedOffensive,
+                authorizedAt = System.currentTimeMillis(),
+                notes = offensiveNotes.trim(),
+            )
+        } else {
+            null
+        }
+
         val scope = AuthorizationScope(
             organizationName = organizationName.trim(),
             authorizedBy = authorizedBy.trim(),
@@ -46,11 +62,16 @@ class AuthorizationViewModel @Inject constructor(
             ssidPatterns = ssidPatterns.map { it.trim() }.filter { it.isNotEmpty() },
             bssidPrefixes = bssidPrefixes.map { it.trim().uppercase() }.filter { it.isNotEmpty() },
             notes = notes.trim(),
+            offensiveScope = offensiveBlock,
         )
         repo.save(scope)
     }
 
     fun clear() {
         repo.clear()
+    }
+
+    companion object {
+        private val BSSID_REGEX = Regex("^[0-9A-F]{2}(:[0-9A-F]{2}){5}$")
     }
 }

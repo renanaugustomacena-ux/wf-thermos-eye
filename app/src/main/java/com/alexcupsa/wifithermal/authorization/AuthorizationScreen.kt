@@ -52,6 +52,8 @@ fun AuthorizationScreen(
     var bssidPrefixes by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var expiresAtIso by remember { mutableStateOf("") }
+    var offensiveBssids by remember { mutableStateOf("") }
+    var offensiveNotes by remember { mutableStateOf("") }
 
     LaunchedEffect(state.scope) {
         val scope = state.scope ?: return@LaunchedEffect
@@ -63,6 +65,8 @@ fun AuthorizationScreen(
         expiresAtIso = scope.expiresAt?.let {
             SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(it))
         }.orEmpty()
+        offensiveBssids = scope.offensiveScope?.authorizedBssids?.joinToString(", ").orEmpty()
+        offensiveNotes = scope.offensiveScope?.notes.orEmpty()
     }
 
     Scaffold(
@@ -140,6 +144,31 @@ fun AuthorizationScreen(
 
             Spacer(Modifier.height(8.dp))
 
+            Text(
+                text = "Layer B — offensive scope",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = "Exact BSSIDs (no prefix, no wildcard) authorized for handshake/PMKID capture and offline cracking. Empty = Layer B inert.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = offensiveBssids,
+                onValueChange = { offensiveBssids = it },
+                label = { Text("Authorized BSSIDs (comma separated, e.g. AA:BB:CC:DD:EE:FF)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = offensiveNotes,
+                onValueChange = { offensiveNotes = it },
+                label = { Text("Offensive scope notes (target purpose, expected use)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(8.dp))
+
             Button(
                 onClick = {
                     viewModel.save(
@@ -149,6 +178,8 @@ fun AuthorizationScreen(
                         bssidPrefixes = bssidPrefixes.split(",").map { it.trim() }.filter { it.isNotEmpty() },
                         expiresAt = parseDate(expiresAtIso),
                         notes = notes,
+                        offensiveBssids = offensiveBssids.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                        offensiveNotes = offensiveNotes,
                     )
                     onBack()
                 },

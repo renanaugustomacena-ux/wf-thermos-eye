@@ -40,4 +40,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
 }

@@ -56,6 +56,7 @@ fun AuditDashboardScreen(
     onNavigateToReports: () -> Unit,
     onNavigateToChannels: () -> Unit,
     onNavigateToSecurity: () -> Unit,
+    onNavigateToLayerB: () -> Unit,
     viewModel: AuditDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -111,6 +112,32 @@ fun AuditDashboardScreen(
         Spacer(Modifier.height(12.dp))
 
         ReportsLink(onNavigateToReports)
+        Spacer(Modifier.height(12.dp))
+
+        LayerBLink(onNavigateToLayerB)
+    }
+}
+
+@Composable
+private fun LayerBLink(onTap: () -> Unit) {
+    Card(
+        onClick = onTap,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Layer B — Capture",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "ESP32 sniffer companion + handshake/PMKID capture + cracking pipeline. Hard-gated by OffensiveScopeGuard — inert until exact authorized BSSIDs are added in Authorization.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
