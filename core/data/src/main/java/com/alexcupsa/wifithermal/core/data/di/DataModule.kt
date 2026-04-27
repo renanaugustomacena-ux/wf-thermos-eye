@@ -3,10 +3,8 @@ package com.alexcupsa.wifithermal.core.data.di
 import android.content.Context
 import androidx.room.Room
 import com.alexcupsa.wifithermal.core.database.AppDatabase
-import com.alexcupsa.wifithermal.core.database.dao.AccessPointDao
-import com.alexcupsa.wifithermal.core.database.dao.FloorPlanDao
-import com.alexcupsa.wifithermal.core.database.dao.MeasurementDao
-import com.alexcupsa.wifithermal.core.database.dao.SurveyDao
+import com.alexcupsa.wifithermal.core.database.dao.IncidentDao
+import com.alexcupsa.wifithermal.core.database.dao.WhitelistDao
 import com.alexcupsa.wifithermal.core.engine.signal.SignalProcessor
 import dagger.Module
 import dagger.Provides
@@ -26,26 +24,18 @@ object DataModule {
         // explicit policy until v1 ships, at which point real Migration
         // objects will replace this and exportSchema will be flipped on.
         @Suppress("DEPRECATION")
-        return Room.databaseBuilder(context, AppDatabase::class.java, "wifi_thermal_scanner.db")
+        return Room.databaseBuilder(context, AppDatabase::class.java, "wf_audit.db")
             .fallbackToDestructiveMigration()
             .build()
     }
 
     @Provides
     @Singleton
-    fun provideSurveyDao(db: AppDatabase): SurveyDao = db.surveyDao()
+    fun provideWhitelistDao(db: AppDatabase): WhitelistDao = db.whitelistDao()
 
     @Provides
     @Singleton
-    fun provideMeasurementDao(db: AppDatabase): MeasurementDao = db.measurementDao()
-
-    @Provides
-    @Singleton
-    fun provideFloorPlanDao(db: AppDatabase): FloorPlanDao = db.floorPlanDao()
-
-    @Provides
-    @Singleton
-    fun provideAccessPointDao(db: AppDatabase): AccessPointDao = db.accessPointDao()
+    fun provideIncidentDao(db: AppDatabase): IncidentDao = db.incidentDao()
 
     @Provides
     @Singleton
