@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.alexcupsa.wifithermal.core.database.AppDatabase
 import com.alexcupsa.wifithermal.core.database.dao.IncidentDao
+import com.alexcupsa.wifithermal.core.database.dao.RssiSampleDao
 import com.alexcupsa.wifithermal.core.database.dao.WhitelistDao
 import com.alexcupsa.wifithermal.core.engine.signal.SignalProcessor
 import dagger.Module
@@ -36,6 +37,10 @@ object DataModule {
     @Provides
     @Singleton
     fun provideIncidentDao(db: AppDatabase): IncidentDao = db.incidentDao()
+
+    @Provides
+    @Singleton
+    fun provideRssiSampleDao(db: AppDatabase): RssiSampleDao = db.rssiSampleDao()
 
     @Provides
     @Singleton

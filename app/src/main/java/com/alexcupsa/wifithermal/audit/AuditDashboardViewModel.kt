@@ -2,14 +2,15 @@ package com.alexcupsa.wifithermal.audit
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.alexcupsa.wifithermal.core.data.repository.AuditPipeline
 import com.alexcupsa.wifithermal.core.data.repository.AuthorizationManifestRepository
 import com.alexcupsa.wifithermal.core.data.repository.IncidentRepository
 import com.alexcupsa.wifithermal.core.data.repository.WhitelistRepository
 import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
-import com.alexcupsa.wifithermal.core.engine.audit.RogueDetector
 import com.alexcupsa.wifithermal.core.engine.audit.ScopeGuard
 import com.alexcupsa.wifithermal.core.model.ScanStatus
 import com.alexcupsa.wifithermal.core.model.audit.AlertSeverity
+import com.alexcupsa.wifithermal.core.model.audit.AnomalyFlag
 import com.alexcupsa.wifithermal.core.model.audit.AuthorizationScope
 import com.alexcupsa.wifithermal.core.model.audit.IncidentEvent
 import com.alexcupsa.wifithermal.core.model.audit.RogueAlert
@@ -28,12 +29,14 @@ data class DashboardUiState(
     val authorizedCount: Int = 0,
     val alertsBySeverity: Map<AlertSeverity, Int> = emptyMap(),
     val criticalAlerts: List<RogueAlert> = emptyList(),
+    val anomalies: List<AnomalyFlag> = emptyList(),
     val recentIncidents: List<IncidentEvent> = emptyList(),
     val scanStatus: ScanStatus = ScanStatus.IDLE,
 )
 
 @HiltViewModel
 class AuditDashboardViewModel @Inject constructor(
+    pipeline: AuditPipeline,
     scanState: WifiScanStateRepository,
     whitelistRepo: WhitelistRepository,
     incidentRepo: IncidentRepository,
@@ -41,20 +44,18 @@ class AuditDashboardViewModel @Inject constructor(
 ) : ViewModel() {
 
     val state: StateFlow<DashboardUiState> = combine(
+        pipeline.alerts,
+        pipeline.anomalies,
         scanState.scanResults,
         scanState.scanStatus,
-        whitelistRepo.observeAll(),
-        scopeRepo.scope,
-        incidentRepo.recent(10),
-    ) { results, status, whitelist, scope, incidents ->
+        combine(
+            whitelistRepo.observeAll(),
+            scopeRepo.scope,
+            incidentRepo.recent(10),
+        ) { whitelist, scope, incidents -> Triple(whitelist, scope, incidents) },
+    ) { alerts, anomalies, results, status, (whitelist, scope, incidents) ->
         val now = System.currentTimeMillis()
         val expired = scope?.isExpired(now) ?: false
-        val alerts = if (scope != null && !expired) {
-            val inScope = ScopeGuard.filter(results, scope)
-            RogueDetector.analyze(inScope, whitelist, now)
-        } else {
-            emptyList()
-        }
         val inScopeCount = if (scope != null && !expired) ScopeGuard.filter(results, scope).size else 0
 
         DashboardUiState(
@@ -65,6 +66,7 @@ class AuditDashboardViewModel @Inject constructor(
             authorizedCount = whitelist.size,
             alertsBySeverity = alerts.groupBy { it.severity }.mapValues { it.value.size },
             criticalAlerts = alerts.filter { it.severity == AlertSeverity.CRITICAL }.take(5),
+            anomalies = anomalies,
             recentIncidents = incidents,
             scanStatus = status,
         )

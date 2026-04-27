@@ -3,6 +3,7 @@ package com.alexcupsa.wifithermal.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -28,6 +29,8 @@ import androidx.navigation.navArgument
 import com.alexcupsa.wifithermal.analysis.ChannelScreen
 import com.alexcupsa.wifithermal.audit.AlertsScreen
 import com.alexcupsa.wifithermal.audit.AuditDashboardScreen
+import com.alexcupsa.wifithermal.audit.IncidentLogScreen
+import com.alexcupsa.wifithermal.audit.TriangulationScreen
 import com.alexcupsa.wifithermal.authorization.AuthorizationScreen
 import com.alexcupsa.wifithermal.scan.ApDetailScreen
 import com.alexcupsa.wifithermal.scan.ScanScreen
@@ -39,8 +42,8 @@ import com.alexcupsa.wifithermal.whitelist.WhitelistScreen
 private enum class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
     DASHBOARD("dashboard", "Audit", Icons.Default.Dashboard),
     ALERTS("alerts", "Alerts", Icons.Default.Warning),
+    INCIDENTS("incidents", "Log", Icons.AutoMirrored.Filled.List),
     WHITELIST("whitelist", "Whitelist", Icons.Default.Shield),
-    SCAN("scan", "Live", Icons.Default.Wifi),
     SETTINGS("settings", "Settings", Icons.Default.Settings),
 }
 
@@ -91,7 +94,20 @@ fun MainNavHost() {
                         onNavigateToAp = { bssid ->
                             navController.navigate("ap/${android.net.Uri.encode(bssid)}")
                         },
+                        onNavigateToTriangulate = { bssid ->
+                            navController.navigate("triangulate/${android.net.Uri.encode(bssid)}")
+                        },
                     )
+                }
+                composable("incidents") {
+                    IncidentLogScreen()
+                }
+                composable(
+                    "triangulate/{bssid}",
+                    arguments = listOf(navArgument("bssid") { type = NavType.StringType }),
+                ) { entry ->
+                    val bssid = entry.arguments?.getString("bssid") ?: ""
+                    TriangulationScreen(bssid = bssid, onBack = { navController.popBackStack() })
                 }
                 composable("whitelist") {
                     WhitelistScreen(

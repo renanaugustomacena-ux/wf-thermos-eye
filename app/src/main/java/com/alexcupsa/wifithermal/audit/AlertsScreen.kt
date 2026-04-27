@@ -33,6 +33,7 @@ import com.alexcupsa.wifithermal.core.model.audit.RogueAlert
 @Composable
 fun AlertsScreen(
     onNavigateToAp: (String) -> Unit,
+    onNavigateToTriangulate: (String) -> Unit,
     viewModel: AlertsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -73,6 +74,7 @@ fun AlertsScreen(
                     alert = alert,
                     onAuthorize = { viewModel.authorize(alert) },
                     onInspect = { onNavigateToAp(alert.bssid) },
+                    onLocate = { onNavigateToTriangulate(alert.bssid) },
                 )
             }
         }
@@ -84,6 +86,7 @@ private fun AlertCard(
     alert: RogueAlert,
     onAuthorize: () -> Unit,
     onInspect: () -> Unit,
+    onLocate: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -119,6 +122,7 @@ private fun AlertCard(
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onInspect) { Text("Inspect") }
+                OutlinedButton(onClick = onLocate) { Text("Locate") }
                 TextButton(onClick = onAuthorize) { Text("Authorize") }
             }
         }

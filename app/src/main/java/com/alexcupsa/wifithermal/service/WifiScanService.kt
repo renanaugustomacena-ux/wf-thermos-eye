@@ -5,7 +5,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -13,7 +17,11 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import com.alexcupsa.wifithermal.core.data.adapter.WifiScanAdapter
+import com.alexcupsa.wifithermal.core.data.repository.AuditPipeline
+import com.alexcupsa.wifithermal.core.data.repository.DeviceLocation
+import com.alexcupsa.wifithermal.core.data.repository.LocationStateRepository
 import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
 import com.alexcupsa.wifithermal.core.model.ScanStatus
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,11 +41,19 @@ class WifiScanService : Service() {
 
     @Inject lateinit var scanAdapter: WifiScanAdapter
     @Inject lateinit var scanState: WifiScanStateRepository
+    @Inject lateinit var locationStateRepo: LocationStateRepository
+    @Suppress("unused") // Eager init: subscribes to scan/whitelist/scope on construction.
+    @Inject lateinit var auditPipeline: AuditPipeline
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var wifiManager: WifiManager
     private lateinit var connectivityManager: ConnectivityManager
+    private lateinit var locationManager: LocationManager
     private var scanJob: Job? = null
+
+    private val locationListener = LocationListener { loc ->
+        publishLocation(loc)
+    }
 
     private val timestampsMutex = Mutex()
     private val scanTimestamps = ArrayDeque<Long>(THROTTLE_MAX_SCANS)
@@ -69,6 +85,7 @@ class WifiScanService : Service() {
         super.onCreate()
         wifiManager = getSystemService(WIFI_SERVICE) as WifiManager
         connectivityManager = getSystemService(ConnectivityManager::class.java)
+        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         ScanNotificationManager.createChannel(this)
         registerReceiver(
             scanReceiver,
@@ -79,6 +96,56 @@ class WifiScanService : Service() {
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .build()
         connectivityManager.registerNetworkCallback(request, networkCallback)
+
+        startLocationUpdates()
+    }
+
+    private fun startLocationUpdates() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) return
+
+        // Prefer FUSED_PROVIDER (Android 12+); fall back to GPS + NETWORK if
+        // not available on the device.
+        val providers = buildList {
+            if (locationManager.allProviders.contains(LocationManager.FUSED_PROVIDER)) {
+                add(LocationManager.FUSED_PROVIDER)
+            } else {
+                if (locationManager.allProviders.contains(LocationManager.GPS_PROVIDER)) {
+                    add(LocationManager.GPS_PROVIDER)
+                }
+                if (locationManager.allProviders.contains(LocationManager.NETWORK_PROVIDER)) {
+                    add(LocationManager.NETWORK_PROVIDER)
+                }
+            }
+        }
+
+        for (provider in providers) {
+            try {
+                locationManager.requestLocationUpdates(
+                    provider,
+                    LOCATION_INTERVAL_MS,
+                    LOCATION_MIN_DISTANCE_M,
+                    locationListener,
+                )
+                locationManager.getLastKnownLocation(provider)?.let { publishLocation(it) }
+            } catch (_: SecurityException) {
+                // Permission revoked between check and call — skip.
+            } catch (_: IllegalArgumentException) {
+                // Provider gone since enumeration — ignore.
+            }
+        }
+    }
+
+    private fun publishLocation(loc: Location) {
+        locationStateRepo.update(
+            DeviceLocation(
+                lat = loc.latitude,
+                lon = loc.longitude,
+                accuracyM = if (loc.hasAccuracy()) loc.accuracy else 100f,
+                timestamp = System.currentTimeMillis(),
+            ),
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -111,6 +178,7 @@ class WifiScanService : Service() {
         scanState.updateStatus(ScanStatus.IDLE)
         runCatching { unregisterReceiver(scanReceiver) }
         runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
+        runCatching { locationManager.removeUpdates(locationListener) }
         super.onDestroy()
     }
 
@@ -238,6 +306,8 @@ class WifiScanService : Service() {
         private const val THROTTLE_WINDOW_MS = 120_000L
         private const val SCAN_INTERVAL_MS = 32_000L
         private const val SCAN_RESULT_WAIT_MS = 3_000L
+        private const val LOCATION_INTERVAL_MS = 15_000L
+        private const val LOCATION_MIN_DISTANCE_M = 2f
 
         // Sentinel value Android returns instead of a real BSSID when the caller
         // does not hold the perms required to read it.

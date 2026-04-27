@@ -2,11 +2,8 @@ package com.alexcupsa.wifithermal.audit
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.alexcupsa.wifithermal.core.data.repository.AuthorizationManifestRepository
+import com.alexcupsa.wifithermal.core.data.repository.AuditPipeline
 import com.alexcupsa.wifithermal.core.data.repository.WhitelistRepository
-import com.alexcupsa.wifithermal.core.data.repository.WifiScanStateRepository
-import com.alexcupsa.wifithermal.core.engine.audit.RogueDetector
-import com.alexcupsa.wifithermal.core.engine.audit.ScopeGuard
 import com.alexcupsa.wifithermal.core.model.SecurityType
 import com.alexcupsa.wifithermal.core.model.audit.AlertSeverity
 import com.alexcupsa.wifithermal.core.model.audit.AuthorizedAccessPoint
@@ -29,26 +26,16 @@ data class AlertsUiState(
 
 @HiltViewModel
 class AlertsViewModel @Inject constructor(
+    pipeline: AuditPipeline,
     private val whitelistRepo: WhitelistRepository,
-    scanState: WifiScanStateRepository,
-    scopeRepo: AuthorizationManifestRepository,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow<AlertSeverity?>(null)
 
     val state: StateFlow<AlertsUiState> = combine(
-        scanState.scanResults,
-        whitelistRepo.observeAll(),
-        scopeRepo.scope,
+        pipeline.alerts,
         _filter,
-    ) { results, whitelist, scope, filter ->
-        val now = System.currentTimeMillis()
-        val alerts = if (scope == null || scope.isExpired(now)) {
-            emptyList()
-        } else {
-            val inScope = ScopeGuard.filter(results, scope)
-            RogueDetector.analyze(inScope, whitelist, now)
-        }
+    ) { alerts, filter ->
         val filtered = if (filter != null) alerts.filter { it.severity == filter } else alerts
         AlertsUiState(
             alerts = filtered.sortedBy { it.severity.ordinal },
