@@ -89,6 +89,8 @@ fun MainNavHost() {
                         onNavigateToAlerts = { navController.navigate("alerts") },
                         onNavigateToWhitelist = { navController.navigate("whitelist") },
                         onNavigateToReports = { navController.navigate("reports") },
+                        onNavigateToChannels = { navController.navigate("channels") },
+                        onNavigateToSecurity = { navController.navigate("security") },
                     )
                 }
                 composable("alerts") {

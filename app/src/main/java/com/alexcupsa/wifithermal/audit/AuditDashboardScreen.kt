@@ -54,6 +54,8 @@ fun AuditDashboardScreen(
     onNavigateToAlerts: () -> Unit,
     onNavigateToWhitelist: () -> Unit,
     onNavigateToReports: () -> Unit,
+    onNavigateToChannels: () -> Unit,
+    onNavigateToSecurity: () -> Unit,
     viewModel: AuditDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -105,7 +107,47 @@ fun AuditDashboardScreen(
             Spacer(Modifier.height(12.dp))
         }
 
+        InsightsRow(onNavigateToChannels, onNavigateToSecurity)
+        Spacer(Modifier.height(12.dp))
+
         ReportsLink(onNavigateToReports)
+    }
+}
+
+@Composable
+private fun InsightsRow(onChannels: () -> Unit, onSecurity: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Card(
+            onClick = onChannels,
+            modifier = Modifier.weight(1f),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Channels", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "Congestion + recommended channels for in-scope APs.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Card(
+            onClick = onSecurity,
+            modifier = Modifier.weight(1f),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Security", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "Crypto posture audit for in-scope APs (WPA2/WPA3, WPS exposure).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
