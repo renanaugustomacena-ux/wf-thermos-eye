@@ -54,7 +54,14 @@ class SavedPasswordExtractor @Inject constructor(
 
     private suspend fun extractFromConfigStore(): RootResult<List<SavedWifiCredential>> {
         val content = rootShell.readFile(WIFI_CONFIG_STORE)
-        if (content !is RootResult.Success) return content
+        if (content !is RootResult.Success) {
+            return when (content) {
+                is RootResult.Error -> RootResult.Error(content.code, content.message)
+                RootResult.NoRoot -> RootResult.NoRoot
+                RootResult.Timeout -> RootResult.Timeout
+                else -> RootResult.Error(-1, "Unknown error")
+            }
+        }
 
         return runCatching {
             val credentials = mutableListOf<SavedWifiCredential>()
@@ -123,7 +130,14 @@ class SavedPasswordExtractor @Inject constructor(
         }
 
         val content = rootShell.readFile(WPA_SUPPLICANT_CONF)
-        if (content !is RootResult.Success) return content
+        if (content !is RootResult.Success) {
+            return when (content) {
+                is RootResult.Error -> RootResult.Error(content.code, content.message)
+                RootResult.NoRoot -> RootResult.NoRoot
+                RootResult.Timeout -> RootResult.Timeout
+                else -> RootResult.Error(-1, "Unknown error")
+            }
+        }
 
         return runCatching {
             val credentials = mutableListOf<SavedWifiCredential>()
@@ -190,7 +204,14 @@ class SavedPasswordExtractor @Inject constructor(
         }
 
         val content = rootShell.readFile(SOFTAP_CONFIG)
-        if (content !is RootResult.Success) return content
+        if (content !is RootResult.Success) {
+            return when (content) {
+                is RootResult.Error -> RootResult.Error(content.code, content.message)
+                RootResult.NoRoot -> RootResult.NoRoot
+                RootResult.Timeout -> RootResult.Timeout
+                else -> RootResult.Error(-1, "Unknown error")
+            }
+        }
 
         return runCatching {
             val lines = content.data.lines()

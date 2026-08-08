@@ -46,7 +46,8 @@ object RouterDetector {
                 for (addr in addrs) {
                     val ip = addr.address
                     if (ip is java.net.Inet4Address && !ip.isLoopbackAddress) {
-                        val gateway = deriveGatewayFromIp(ip.hostAddress)
+                        val hostAddr = ip.hostAddress ?: continue
+                        val gateway = deriveGatewayFromIp(hostAddr)
                         if (gateway != null && isReachable(gateway)) {
                             return@withContext gateway
                         }
