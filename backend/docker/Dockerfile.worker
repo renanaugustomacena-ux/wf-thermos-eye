@@ -1,0 +1,27 @@
+# WF-Thermos-Eye Hashcat Worker
+# Requires NVIDIA GPU runtime
+
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    hashcat \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir redis
+
+# Copy worker code
+COPY api/config.py ./api/
+COPY worker/ ./worker/
+
+# Create directories
+RUN mkdir -p /data/wordlists /data/rules /tmp/hashcat
+
+# Run the worker
+CMD ["python3", "-m", "worker.cracker"]

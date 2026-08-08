@@ -1,0 +1,55 @@
+# WF-Thermos-Eye Backend Stack
+# Deploy on a machine with NVIDIA GPU and Tailscale
+
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - API_KEY=${API_KEY:-changeme}
+      - DEBUG=${DEBUG:-false}
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - HASHCAT_PATH=/usr/bin/hashcat
+      - WORDLIST_DIR=/data/wordlists
+      - RULES_DIR=/data/rules
+      - TEMP_DIR=/tmp/hashcat
+    volumes:
+      - ./wordlists:/data/wordlists:ro
+      - ./rules:/data/rules:ro
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  redis-data:

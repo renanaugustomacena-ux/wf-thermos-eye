@@ -1,0 +1,18 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "scope_filter.c"
+        "ssid_cache.c"
+        "hashcat_formatter.c"
+        "pmkid_extractor.c"
+        "eapol_tracker.c"
+        "wifi_sniffer.c"
+        "ble_service.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_event
+        bt
+)

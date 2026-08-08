@@ -1,0 +1,2 @@
+# WF-Thermos-Eye Windows Companion
+# No external dependencies required - uses Python stdlib only

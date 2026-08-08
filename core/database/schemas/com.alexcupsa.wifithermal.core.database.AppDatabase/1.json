@@ -1,0 +1,377 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "482e5dc0efb8e6eb572ef83d879e4783",
+    "entities": [
+      {
+        "tableName": "authorized_aps",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bssid` TEXT NOT NULL, `ssid` TEXT NOT NULL, `location` TEXT, `owner` TEXT, `deviceType` TEXT NOT NULL, `expectedSecurity` TEXT NOT NULL, `notes` TEXT, `authorizedAt` INTEGER NOT NULL, PRIMARY KEY(`bssid`))",
+        "fields": [
+          {
+            "fieldPath": "bssid",
+            "columnName": "bssid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ssid",
+            "columnName": "ssid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "location",
+            "columnName": "location",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "owner",
+            "columnName": "owner",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deviceType",
+            "columnName": "deviceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expectedSecurity",
+            "columnName": "expectedSecurity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "authorizedAt",
+            "columnName": "authorizedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "bssid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_authorized_aps_ssid",
+            "unique": false,
+            "columnNames": [
+              "ssid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_authorized_aps_ssid` ON `${TABLE_NAME}` (`ssid`)"
+          },
+          {
+            "name": "index_authorized_aps_deviceType",
+            "unique": false,
+            "columnNames": [
+              "deviceType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_authorized_aps_deviceType` ON `${TABLE_NAME}` (`deviceType`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "incidents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `kind` TEXT NOT NULL, `bssid` TEXT NOT NULL, `ssid` TEXT, `severity` TEXT NOT NULL, `summary` TEXT NOT NULL, `evidenceJson` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bssid",
+            "columnName": "bssid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ssid",
+            "columnName": "ssid",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceJson",
+            "columnName": "evidenceJson",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_incidents_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_incidents_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          },
+          {
+            "name": "index_incidents_bssid",
+            "unique": false,
+            "columnNames": [
+              "bssid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_incidents_bssid` ON `${TABLE_NAME}` (`bssid`)"
+          },
+          {
+            "name": "index_incidents_kind",
+            "unique": false,
+            "columnNames": [
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_incidents_kind` ON `${TABLE_NAME}` (`kind`)"
+          },
+          {
+            "name": "index_incidents_severity",
+            "unique": false,
+            "columnNames": [
+              "severity"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_incidents_severity` ON `${TABLE_NAME}` (`severity`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "rssi_samples",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bssid` TEXT NOT NULL, `rssi` INTEGER NOT NULL, `frequencyMhz` INTEGER NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `accuracyM` REAL NOT NULL, `timestamp` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bssid",
+            "columnName": "bssid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rssi",
+            "columnName": "rssi",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "frequencyMhz",
+            "columnName": "frequencyMhz",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accuracyM",
+            "columnName": "accuracyM",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_rssi_samples_bssid",
+            "unique": false,
+            "columnNames": [
+              "bssid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_rssi_samples_bssid` ON `${TABLE_NAME}` (`bssid`)"
+          },
+          {
+            "name": "index_rssi_samples_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_rssi_samples_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "captured_handshakes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bssid` TEXT NOT NULL, `ssid` TEXT NOT NULL, `kind` TEXT NOT NULL, `payloadHex` TEXT NOT NULL, `capturedAt` INTEGER NOT NULL, `sourceDevice` TEXT NOT NULL, `status` TEXT NOT NULL, `backendJobId` TEXT, `crackResult` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bssid",
+            "columnName": "bssid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ssid",
+            "columnName": "ssid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadHex",
+            "columnName": "payloadHex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedAt",
+            "columnName": "capturedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceDevice",
+            "columnName": "sourceDevice",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backendJobId",
+            "columnName": "backendJobId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "crackResult",
+            "columnName": "crackResult",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_captured_handshakes_bssid",
+            "unique": false,
+            "columnNames": [
+              "bssid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_captured_handshakes_bssid` ON `${TABLE_NAME}` (`bssid`)"
+          },
+          {
+            "name": "index_captured_handshakes_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_captured_handshakes_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_captured_handshakes_capturedAt",
+            "unique": false,
+            "columnNames": [
+              "capturedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_captured_handshakes_capturedAt` ON `${TABLE_NAME}` (`capturedAt`)"
+          }
+        ],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '482e5dc0efb8e6eb572ef83d879e4783')"
+    ]
+  }
+}
